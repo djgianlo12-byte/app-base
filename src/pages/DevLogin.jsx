@@ -1,97 +1,69 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Loader2, Copy, Check } from 'lucide-react';
+import { Users } from 'lucide-react';
 
 const roles = [
-  { role: 'admin', label: 'Admin', email: 'admin@test.nl' },
-  { role: 'kantoor', label: 'Kantoor', email: 'kantoor@test.nl' },
-  { role: 'buitendienst', label: 'Buitendienst', email: 'buitendienst@test.nl' },
-  { role: 'tekenaar', label: 'Tekenaar', email: 'tekenaar@test.nl' },
-  { role: 'verkoper', label: 'Verkoper', email: 'verkoper@test.nl' },
+  { role: 'admin', label: 'Admin', email: 'admin@test.nl', fullName: 'Admin' },
+  { role: 'kantoor', label: 'Kantoor', email: 'kantoor@test.nl', fullName: 'Kantoor Medewerker' },
+  { role: 'buitendienst', label: 'Buitendienst', email: 'buitendienst@test.nl', fullName: 'Buitendienst' },
+  { role: 'tekenaar', label: 'Tekenaar', email: 'tekenaar@test.nl', fullName: 'Tekenaar' },
+  { role: 'verkoper', label: 'Verkoper', email: 'verkoper@test.nl', fullName: 'Verkoper' },
 ];
 
-const password = 'Test123456!';
-
 export default function DevLogin() {
-  const [loading, setLoading] = useState(false);
   const [user, setUser] = useState(null);
-  const [accounts, setAccounts] = useState(null);
-  const [copied, setCopied] = useState(null);
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
   useEffect(() => {
     base44.auth.me().then(setUser).catch(() => setUser(null));
   }, []);
 
-  const createAccounts = async () => {
-    setLoading(true);
+  const handleLogin = async (email) => {
     try {
-      const result = await base44.functions.invoke('createTestAccounts', {});
-      setAccounts(result.data);
+      await base44.auth.login(email);
+      const redirect = searchParams.get('redirect');
+      if (redirect) {
+        window.location.href = redirect;
+      } else {
+        navigate('/');
+      }
     } catch (error) {
-      console.error('Error:', error);
-      alert('Accounts al aangemaakt of fout bij aanmaken');
-    } finally {
-      setLoading(false);
+      console.error('Login failed:', error);
     }
   };
 
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
-    setCopied(text);
-    setTimeout(() => setCopied(null), 2000);
-  };
-
-  if (!user || user.role !== 'admin') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md p-8 border-slate-200">
-          <h1 className="text-2xl font-bold text-slate-900 mb-2">Dev Login</h1>
-          <p className="text-slate-600 mb-4">Je moet ingelogd zijn als admin om test accounts aan te maken.</p>
-          <Button onClick={() => base44.auth.redirectToLogin()} className="w-full">
-            Inloggen
-          </Button>
-        </Card>
-      </div>
-    );
-  }
-
-  if (!accounts) {
+  if (user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center p-4">
         <Card className="w-full max-w-md p-8 border-slate-200 space-y-6">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 mb-1">Test Accounts</h1>
-            <p className="text-sm text-slate-600">Maak test accounts aan voor alle rollen</p>
+            <h1 className="text-2xl font-bold text-slate-900 mb-1">Ingelogd</h1>
+            <p className="text-sm text-slate-600">Je bent ingelogd als <span className="font-semibold">{user.full_name}</span> ({user.role})</p>
+          </div>
+
+          <div className="bg-slate-50 rounded-lg p-4 space-y-2">
+            <p className="text-sm text-slate-600">Email: <span className="font-mono">{user.email}</span></p>
+            <p className="text-sm text-slate-600">Rol: <span className="font-semibold capitalize">{user.role}</span></p>
           </div>
 
           <Button 
-            onClick={createAccounts} 
-            disabled={loading}
-            className="w-full h-12 bg-blue-600 hover:bg-blue-700"
+            onClick={() => base44.auth.logout()}
+            className="w-full"
           >
-            {loading ? (
-              <span className="flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Accounts aanmaken...
-              </span>
-            ) : (
-              'Accounts aanmaken'
-            )}
+            Uitloggen
           </Button>
 
-          <div className="pt-4 border-t border-slate-200">
-            <Button 
-              variant="outline" 
-              className="w-full"
-              onClick={() => base44.auth.logout()}
-            >
-              Uitloggen
-            </Button>
-          </div>
+          <Button 
+            variant="outline"
+            onClick={() => navigate('/')}
+            className="w-full"
+          >
+            Naar Dashboard
+          </Button>
         </Card>
       </div>
     );
@@ -99,56 +71,26 @@ export default function DevLogin() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md p-8 border-slate-200 space-y-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 mb-1">Login Gegevens</h1>
-          <p className="text-sm text-slate-600">Accounts aangemaakt! Klik op email/wachtwoord om te kopiëren</p>
+      <Card className="w-full max-w-md p-8 border-slate-200 space-y-6">
+        <div className="text-center">
+          <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4">
+            <Users className="w-6 h-6 text-white" />
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900 mb-1">Kies je rol</h1>
+          <p className="text-sm text-slate-600">Selecteer een account om in te loggen</p>
         </div>
 
         <div className="space-y-2">
-          {roles.map(({ role, label, email }) => (
-            <div key={role} className="bg-slate-50 rounded-lg p-4 space-y-2">
-              <p className="font-semibold text-slate-900">{label}</p>
-              <button
-                onClick={() => copyToClipboard(email)}
-                className="w-full flex items-center justify-between text-left text-sm p-2 bg-white rounded border border-slate-200 hover:border-blue-300 transition-colors"
-              >
-                <span className="text-slate-600">{email}</span>
-                {copied === email ? (
-                  <Check className="w-4 h-4 text-green-600" />
-                ) : (
-                  <Copy className="w-4 h-4 text-slate-400" />
-                )}
-              </button>
-              <button
-                onClick={() => copyToClipboard(password)}
-                className="w-full flex items-center justify-between text-left text-sm p-2 bg-white rounded border border-slate-200 hover:border-blue-300 transition-colors"
-              >
-                <span className="text-slate-600">••••••••••</span>
-                {copied === password ? (
-                  <Check className="w-4 h-4 text-green-600" />
-                ) : (
-                  <Copy className="w-4 h-4 text-slate-400" />
-                )}
-              </button>
-            </div>
+          {roles.map(({ role, label, email, fullName }) => (
+            <button
+              key={role}
+              onClick={() => handleLogin(email)}
+              className="w-full text-left p-4 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded-xl transition-colors"
+            >
+              <p className="font-semibold text-slate-900">{fullName}</p>
+              <p className="text-xs text-slate-500">{email} · <span className="capitalize">{role}</span></p>
+            </button>
           ))}
-        </div>
-
-        <div className="pt-4 border-t border-slate-200 space-y-2">
-          <Button 
-            className="w-full"
-            onClick={() => base44.auth.redirectToLogin()}
-          >
-            Ga naar inloggen
-          </Button>
-          <Button 
-            variant="outline" 
-            className="w-full"
-            onClick={() => base44.auth.logout()}
-          >
-            Uitloggen
-          </Button>
         </div>
       </Card>
     </div>
